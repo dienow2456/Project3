@@ -1,75 +1,80 @@
+#include <algorithm>
+#include <iostream>
+#include <vector>
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h> 
 #include<fstream>
 
+
 using namespace std;
-const char STX = '\002', ETX = '\003';
- 
-int compareStrings(const void *a, const void *b) {
-    char *aa = *(char **)a;
-    char *bb = *(char **)b;
-    return strcmp(aa, bb);
+const int STX =0x02 ,ETX = 0x03;
+ 	//put the last element of the string a[] to the beginning
+void compareStrings(string &a) {
+    char t=a[a.length() -1];
+    for(int i=a.length() -1; i>0; i--){
+    	a[i]=a[i-1];
+		}
+	a[0]=t;
 }
- 
-int bwt(const char *s, char r[]) {
-    int i, len = strlen(s) + 2;
-    char *ss, *str;
-    char **table;
-    if (strchr(s, STX) || strchr(s, ETX)) return 1;
-    ss = (char *)calloc(len + 1, sizeof(char ));
-    sprintf(ss, "%c%s%c", STX, s, ETX);
-    table = (char **)malloc(len * sizeof(char));
-    for (i = 0; i < len; ++i) {
-        str = (char *)calloc(len + 1, sizeof(char));
-        strcpy(str, ss + i);
-        if (i > 0) strncat(str, ss, i);
-        table[i] = str;
+
+ 	// encoding
+string bwt(const string &s) {
+   for (int i=0; i<s.length() ; i++) {
+        if (s[i] == STX||s[i]==ETX) printf("Input can't contain STX or ETX");
     }
-    qsort(table, len, sizeof(const char *), compareStrings);
-    for(i = 0; i < len; ++i) {
-        r[i] = table[i][len - 1];
-        free(table[i]);
+    string ss;
+	ss+=STX;
+	ss+=s;
+	ss+=ETX;
+	vector<string> table;
+	for(int i=0; i<ss.length() ;i++){
+		table.push_back(ss);
+		compareStrings(ss);
+		}
+    //table.sort();
+    sort(table.begin(), table.end() );
+    string out;
+    for (size_t i=0;i<table.size();i++) {
+        out += table[i][table.size()-1];
     }
-    free(table);
-    free(ss);
-    return 0;
+    return out;
 }
- 
-void ibwt(const char *r, char s[]) {
-    int i, j, len = strlen(r);
-    char **table =(char **) malloc(len * sizeof(char ));
-    for (i = 0; i < len; ++i) table[i] = (char *)calloc(len + 1, sizeof(char));
-    for (i = 0; i < len; ++i) {
-        for (j = 0; j < len; ++j) {                        
-            memmove(table[j] + 1, table[j], len);
-            table[j][0] = r[j];
+ 	//decoding
+string ibwt(const string &r) {
+    int len = r.length();
+    vector<string> table(len);
+    for (int i = 0; i < len; i++) {
+        for (int j = 0; j < len; j++) {
+            table[j] = r[j] + table[j];
         }
-        qsort(table, len, sizeof(const char *), compareStrings);
+        sort(table.begin(), table.end());
     }
-    for (i = 0; i < len; ++i) {
-        if (table[i][len - 1] == ETX) {
-            strncpy(s, table[i] + 1, len - 2);
-            break;
+    string s="";
+    s+=table[0];
+    for(int i=0; i<s.length() ;i++){
+    	if (s[i] == ETX) {
+            return s.substr(1, s.length() - 2);
         }
     }
-    for (i = 0; i < len; ++i) free(table[i]);
-    free(table);
+    return {};
 }
  
-void makePrintable(const char *s, char t[]) {
-    strcpy(t, s);
-    for ( ; *t != '\0'; ++t) {
-        if (*t == STX) *t = '$';
-        else if (*t == ETX) *t = '@';
+string makePrintable(const string &s) {
+	string ss="";
+	ss+=s;
+    for (int i=0; i<s.length() ; i++) {
+        if (ss[i] == STX) ss[i] ='^';
+        else if (ss[i] == ETX) ss[i] = '|';
     }
+    return ss;
 }
- 
+                                
 int main() {
-    int i, res, len;
-    char *t, *r, *s;
+	//open the input file containing the information to be encoded
+    string res;
     fstream f;
-	f.open("test.txt", ios::in);
+	f.open("input.txt", ios::in);
 	string data;
 	string line;
 	while (!f.eof())
@@ -80,27 +85,18 @@ int main() {
     char* input_text = new char[data.size()+1];
 	copy(data.begin(), data.end(), input_text);
 	input_text[data.size()] = '\0';
-    int len_text = strlen(input_text);     
-    t = (char *)calloc(len_text + 1, sizeof(char));
-    makePrintable(input_text, t);
-    printf("%s\n", t);
+    printf("%s\n", input_text);
     printf(" --> ");
-    r =(char *) calloc(len + 3, sizeof(char));
-    res = bwt(input_text, r);
-    if (res == 1) {
-            printf("ERROR: String can't contain STX or ETX\n");
-        }
-        else {
-            makePrintable(r, t);
-            printf("%s\n", t);
-        }
-        s = (char *)calloc(len + 1, sizeof(char));
-        ibwt(r, s);
-        makePrintable(s, t);
-        printf(" --> %s\n\n", t);
-        free(t);
-        free(r);
-        free(s);
+    //burrows wheeler transform encoding
+    res = bwt(input_text);
+    //create output.txt file to contain encrypted code	
+    fstream output("output.txt",ios::out);
+    output<<makePrintable(res);
+   	// decoding 
+    output.close() ;
+	cout << makePrintable(res) << "\n";
+    string r=ibwt(res);
+    cout << " --> " << r << "\n\n";
     return 0;
 }
 	
